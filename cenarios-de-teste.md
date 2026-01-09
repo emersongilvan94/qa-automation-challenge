@@ -524,15 +524,51 @@ public class LoginAPITest {
 Simular comportamento assíncrono de carregamento do dashboard (até 5 segundos), validando a URL e o conteúdo da página.
 Respostas / Estratégia:
 
-Para validar comportamento assíncrono do dashboard, utilizamos WebDriverWait aguardando:
-- mudança de URL para /dashboard
-- presença de elemento-chave (#welcome)
-O tempo máximo configurado é 5 segundos, conforme requisito. Caso ultrapasse, o teste falha automaticamente, garantindo validação de performance funcional.
-Essa abordagem evita uso de Thread.sleep e garante estabilidade.
+Para validar o carregamento assíncrono do dashboard, a estratégia utilizada é baseada em esperas explícitas, evitando o uso de Thread.sleep, que torna os testes frágeis e dependentes de tempo fixo.
+
+O teste considera que o dashboard está carregado quando:
+
+A URL contém /dashboard;
+
+Um elemento chave da página (ex: #welcome ou #dashboardTitle) está visível;
+
+O tempo máximo de espera é de 5 segundos.
+
+Exemplo de implementação com Selenium
+
+WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
+
+wait.until(ExpectedConditions.urlContains("/dashboard"));
+wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("welcome")));
+
+Critério de aprovação
+
+O teste é considerado aprovado quando:
+
+A URL é validada dentro do tempo limite;
+
+O elemento principal do dashboard é exibido;
+
+Nenhuma exceção de timeout ocorre.
+
+Caso o tempo ultrapasse 5 segundos, o teste falha automaticamente, garantindo controle de performance funcional.
+
+Benefícios da abordagem
+
+Evita flakiness;
+
+Garante sincronização real com o frontend;
+
+Torna os testes determinísticos;
+
+Atende boas práticas de automação UI.
 
 🧮 Parte E – SQL e Banco de Dados (PostgreSQL) (30 pts)
 Avaliar entendimento e interpretação de consultas SQL, correção de erros e elaboração de cenários de teste baseados em dados.
+
 Exemplo 1 – Propósito e correção
+sql
+
 SELECT u.username, COUNT(a.id) AS total_logins
 FROM usuarios u
 LEFT JOIN auditoria_login a ON a.usuario_id = u.id AND a.sucesso = true
@@ -540,16 +576,17 @@ WHERE u.perfil = 'ADMIN'
 GROUP BY u.username
 HAVING COUNT(a.id) > 5
 ORDER BY total_logins DESC;
+
 Perguntas: 1. Qual o propósito dessa consulta?
 2. Há erros lógicos ou sintáticos?
 3. Que tipo de cenário de teste você derivaria a partir dela?
 Resposta: 
 1. Propósito da consulta
 Listar usuários ADMIN que tiveram mais de 5 logins bem-sucedidos, ordenados do maior para o menor número de logins.
+
 2.Há erros lógicos ou sintáticos?
-Sintaticamente correta.
-Possível erro lógico: se o usuário ADMIN nunca logou com sucesso, ele será ignorado pelo HAVING COUNT(a.id) > 5.
-Isso é esperado dependendo da regra de negócio.
+Não há erro sintático. A consulta está correta. O uso do LEFT JOIN com filtro no ON garante que apenas logins com sucesso sejam contados.
+
 3. Cenário de teste derivado
 | Cenário                                                |
 | ------------------------------------------------------ |
@@ -559,17 +596,25 @@ Isso é esperado dependendo da regra de negócio.
 | Usuário ADMIN sem logins não deve aparecer             |
 
 Exemplo 2 – Identificação de erro lógico
+
 SELECT * FROM usuarios WHERE bloqueado = 'false';
+
 Perguntas: 1. O que há de errado nesta consulta no PostgreSQL?
 2. Como corrigir?
 3. Como um teste automatizado poderia detectar essa falha?
+
 Resposta: 
 1.  O que há de errado nesta consulta no PostgreSQL?
 Erro. Em PostgreSQL, bloqueado é boolean → não deve ser comparado com string.
-2. Como corrigir?  SELECT * FROM usuarios WHERE bloqueado = false;
+
+2. Como corrigir?
+   SELECT * FROM usuarios WHERE bloqueado = false;
+   
 3. Como um teste automatizado poderia detectar essa falha?
 Um teste SQL que valide:
+
 SELECT COUNT(*) FROM usuarios WHERE bloqueado = false;
+
 Se a query errada for usada, retornará 0 mesmo havendo usuários desbloqueados.
 
 Exemplo 3 – Verificação de bloqueio
@@ -580,17 +625,20 @@ Perguntas: 1. Descreva um cenário que resulte em “BLOQUEADO”;
 2. Como validar a consistência após o teste;
 3. Como limpar a base após o teste?
 Resposta:
+
 1. Cenário que resulta em BLOQUEADO
 Usuário realiza 3 ou mais tentativas de login inválidas consecutivas.
 
 2. Como validar consistência
 Após 3 falhas:
+
 SELECT status FROM ... WHERE username = 'x';
+
 Deve retornar BLOQUEADO.
 Também validar que o sistema bloqueia login.
 
 
-3. Como limpar a base
+4. Como limpar a base
 DELETE FROM usuarios WHERE test_id = 'uuid';
 
 
@@ -605,6 +653,7 @@ Resposta:
 
 1.Erro
 (+) é sintaxe Oracle, não existe no PostgreSQL.
+
 2.Forma correta:
 SELECT u.username, a.data_evento
 FROM usuarios u
@@ -615,13 +664,16 @@ ON u.id = a.usuario_id;
 ERROR: syntax error at or near "+"
 
 Exemplo 5 – Integridade e dados órfãos
+
 SELECT a.id, a.usuario_id
 FROM auditoria_login a
 WHERE a.usuario_id NOT IN (SELECT id FROM usuarios);
+
 Perguntas: 1. Qual o propósito da consulta?
 2. Como ela contribui para testes de integração?
 3. Que cenário de teste validaria isso?
 4. Como evitar o problema no banco?
+
 Resposta: 
 1. Propósito
 Detectar registros de auditoria sem usuário correspondente.
@@ -651,4 +703,5 @@ Reprodutibilidade	15
 O candidato deve entregar um repositório Git (público ou zipado) contendo: - Código-fonte dos testes automatizados;
 - Arquivo cenarios-de-teste.md com as análises;
 - Respostas SQL documentadas neste arquivo;
+
 - Instruções de execução no README.md.
